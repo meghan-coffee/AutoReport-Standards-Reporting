@@ -1,0 +1,789 @@
+---
+title: "blah blah"
+output:
+  word_document: default
+  html_document:
+    df_print: paged
+---
+
+  > this is how to print a flextable in a R Markdown document
+
+```{r, echo=FALSE}
+################################################################################
+# Set here all necessary definitions                                        ####
+################################################################################
+# Set data location dir
+dataLoc <- "/Users/mecoffee/Documents/GitHub/AutoReport-Standards-Reporting/StandardsReporting PA/"
+
+# Set state 2-letter abbreviation
+stateAbbr <- 'PA'
+
+# Set assets definition file name
+assetsFile <- "Assets_Definitions.xlsx"
+
+################################################################################
+# DO NOT EDIT BELOW THIS POINT, LEST YOU REALLY KNOW WHAT YOU ARE DOING!!!  ####
+################################################################################
+# List needed packages
+pkgs <- c('flextable', 'here', 'kableExtra',
+          'knitr', 'markdown', 'readxl','rprojroot')
+
+# Install whatever is not installed
+instPkgs <- installed.packages()
+notInst  <- !pkgs %in% instPkgs[,"Package"]
+notInst  <- pkgs[notInst]
+
+if(length(notInst) >= 1){
+  sapply(notInst, FUN = function(x) install.packages(x, dependencies = TRUE))
+}
+
+# Now load them
+lapply(pkgs, require, character.only = TRUE)
+rm(instPkgs, notInst, pkgs)
+
+# Source supporting functions
+source(file.path(here(), "supportFuncs.R"))
+
+# List data input files
+dataFiles <- list.files(path = dataLoc,
+                        pattern = paste0(stateAbbr, ".+xlsx"))
+
+# Set name of sheets that can be imported. Each sheet matches a sub-domain,
+# such as "ESS1"
+sheetsToKeep <- c("Grade 2")
+
+# Set name of columns to keep. We are keeping only the columns that are
+# necessary for the final reporting table.
+colstoKeep <- c("Domain", "Core Idea", "PE", "CS", "AB", "PA Context", "SEP", "DCI", "CCC", "PA Career Ready Skills", "AFNR", "ISTE", "ELA", "NAAEE", "Math", "Social Studies", "ITEEA")
+
+# Load assets definition
+assetsDefs <- as.data.frame(read_xlsx(file.path(here(), assetsFile)))
+assetsDefs$merge_to <- as.numeric(assetsDefs$merge_to)
+
+# Get the data, clean it up, reshape it
+
+# First figure out what sheets are present in the workbook
+# Get rid of sheets without actual data
+
+# ADD HERE LOOP OVER EACH FILE                                              ####
+workBookSheets <- excel_sheets(dataFiles)
+workBookSheets <- workBookSheets[workBookSheets %in% sheetsToKeep]
+
+# Create empty data.frame that will hold reshaped and ready to go data
+readyData <- data.frame(col1 = character(),
+                        col2 = character(),
+                        col3 = character(),
+                        col4 = character(),
+                        col5 = character(),
+                        col6 = character(),
+                        col7 = character()
+                      )
+
+# Loop over each worksheet, reshape the data, and put in a table ready to
+# format. Save each sheet inside the 'processedWorkBook' list
+
+processedWorkBook <- list()
+
+for(sheet in workBookSheets){
+  tempData <- read_xlsx(dataFiles, sheet = sheet)
+  tempData <- tempData[, colstoKeep]
+
+  # Redo the PE to get it ready for use on the table
+  # tempData$PE_redone <- paste0(tempData$Level, ".",
+  #                              substr(tempData$Domain, 1 , nchar(tempData$Domain) -1 ), ".",
+  #                              substr(tempData$Domain, nchar(tempData$Domain),
+  #                                     nchar(tempData$Domain) ), ".",
+  #                              tempData$Number, " ",
+  #                              tempData$PE)
+
+  # Now turn each row to a set of five rows, that can then easily be reformatted
+  # using kableExtra
+  out <- do.call(rbind, apply(tempData, 1, recastRow))
+  row.names(out) <- NULL
+
+  # Put it back on the workBook sheet
+  processedWorkBook[[sheet]] <- out
+  rm(tempData, out)
+}
+rm(sheet)
+```
+
+```{r}
+processedWorkBook
+```
+
+
+```{r}
+# Set default properties that will be overwritten on a case by case basis
+set_flextable_defaults(font.family = NULL,
+                       font.size = 9,
+                       fonts_ignore = TRUE,
+                       table.layout = "fixed")
+
+# Create table
+ft <- flextable(processedWorkBook[['Grade 2']])
+```
+
+
+```{r}
+ft
+```
+
+
+
+```{r}
+# Create header
+ft <- delete_part(ft, "header")
+ft
+```
+
+# ```{r}
+# ft <- add_header(ft,
+#                  V1 = "Earth and Space Sciences",
+#                  V2 = "Earth and Space Sciences",
+#                  V3 = "Earth and Space Sciences")
+# ft
+# ```
+
+# ```{r}
+# ft <- merge_h(ft, part = "header")
+# ft
+# ```
+
+# ```{r}
+# ft <- align(ft, 1, 1, align = "center", part = "header")
+# ft
+# ```
+
+# ```{r}
+# ft <- bold(ft, 1, 1, part = "header")
+# ft
+# ```
+
+# ```{r}
+# ft <- bg(ft, 1, 1, part = "header", bg = "#fefefe")
+# ft
+# ```
+
+
+
+```{r}
+# Set outside borders
+ft <- border_outer(ft, border = fp_border_default(
+                      color = "black",
+                      style = "solid",
+                      width = 1),
+                    part = "all")
+ft
+```
+
+# ```{r}
+# ft <-
+#    border(ft, i = 1, j = 1, border = fp_border_default(
+#        color = "black",
+#        style = "solid",
+#        width = 2),
+#      part = "body"
+#    )
+# ft
+# ```
+
+
+```{r} 
+ ft <-
+    border(ft, border = fp_border_default(
+        color = "black",
+        style = "solid",
+        width = 2),
+        part = "all"
+     )
+ft
+```
+
+
+```{r}
+nrow(ft$body$dataset)
+```
+
+```{r}
+assetsDefs$asset
+```
+
+```{r}
+seq(from = asset_row,
+                      to = nrow(ft$body$dataset),
+                      by = 9)
+```
+
+```{r}
+ft
+```
+
+
+```{r}
+# Now loop per asset and format
+
+for (asset in assetsDefs$asset) {
+  # Get asset defs
+  rows_present   <- assetsDefs[assetsDefs$asset == asset, "rows_present"]
+  
+  asset_row   <- assetsDefs[assetsDefs$asset == asset, "asset_row"]
+  asset_col   <- assetsDefs[assetsDefs$asset == asset, "asset_col"]
+  merge_to    <- assetsDefs[assetsDefs$asset == asset, "merge_to"]
+  asset_font  <- assetsDefs[assetsDefs$asset == asset, "asset_font"]
+  font_size   <- assetsDefs[assetsDefs$asset == asset, "font_size"]
+  is_bold     <- assetsDefs[assetsDefs$asset == asset, "is_bold"]
+  is_italic   <- assetsDefs[assetsDefs$asset == asset, "is_italic"]
+  font_color  <- assetsDefs[assetsDefs$asset == asset, "font_color"]
+  bg_color    <- assetsDefs[assetsDefs$asset == asset, "bg_color"]
+  v_align     <- assetsDefs[assetsDefs$asset == asset, "v_align"]
+  h_align     <- assetsDefs[assetsDefs$asset == asset, "h_align"]
+  hline_below <-
+    assetsDefs[assetsDefs$asset == asset, "hline_below"]
+  vline_left  <- assetsDefs[assetsDefs$asset == asset, "vline_left"]
+
+  # Merge if necessary                                                      ####
+  if (!is.na(merge_to)) {
+    for (the_row in seq(from = asset_row,
+                        to = nrow(ft$body$dataset),
+                        by = 9)) {
+      # Merge cells
+      ft <- merge_at(ft, i = the_row, j = 1:merge_to)
+    }
+  }
+  
+}
+
+ft
+```
+
+```{r}
+# Now loop per asset and format
+for (asset in assetsDefs$asset) {
+  # Get asset defs
+  asset_row   <- assetsDefs[assetsDefs$asset == asset, "asset_row"]
+  asset_col   <- assetsDefs[assetsDefs$asset == asset, "asset_col"]
+  merge_to    <- assetsDefs[assetsDefs$asset == asset, "merge_to"]
+  asset_font  <- assetsDefs[assetsDefs$asset == asset, "asset_font"]
+  font_size   <- assetsDefs[assetsDefs$asset == asset, "font_size"]
+  is_bold     <- assetsDefs[assetsDefs$asset == asset, "is_bold"]
+  is_italic   <- assetsDefs[assetsDefs$asset == asset, "is_italic"]
+  font_color  <- assetsDefs[assetsDefs$asset == asset, "font_color"]
+  bg_color    <- assetsDefs[assetsDefs$asset == asset, "bg_color"]
+  v_align     <- assetsDefs[assetsDefs$asset == asset, "v_align"]
+  h_align     <- assetsDefs[assetsDefs$asset == asset, "h_align"]
+  hline_below <-
+    assetsDefs[assetsDefs$asset == asset, "hline_below"]
+  vline_left  <- assetsDefs[assetsDefs$asset == asset, "vline_left"]
+
+  
+  #compose complex cell for "Domain"
+ if (asset == "Domain") {
+    for (the_row in seq(from = asset_row,
+                        to = nrow(ft$body$dataset),
+                        by = 9)) {
+      ft <-  compose(
+        ft,
+        i = the_row,
+        j = asset_col,
+        value =  as_paragraph(
+          as_chunk(
+            "Domain\n",
+            props = fp_text_default(
+              color = "#201209",
+              bold = TRUE,
+              font.size = font_size
+            )
+          ),
+          as_i = V1
+        )
+      )
+    }
+ } 
+  
+  #compose complex cell for "Core Idea"
+  if (asset == "Core Idea_statement") {
+    for (the_row in seq(from = asset_row,
+                        to = nrow(ft$body$dataset),
+                        by = 9)) {
+      ft <-  compose(
+        ft,
+        i = the_row,
+        j = asset_col,
+        value =  as_paragraph(
+          as_chunk(
+            "Core Idea\n",
+            props = fp_text_default(
+              color = "#201209",
+              bold = TRUE,
+              font.size = font_size
+            )
+          ),
+          as_i = V1
+        )
+      )
+    }
+  } 
+  
+  #compose complex cell for Performance Expectation
+  if (asset == "PE_statement") {
+    for (the_row in seq(from = asset_row,
+                        to = nrow(ft$body$dataset),
+                        by = 9)) {
+      ft <-  compose(
+        ft,
+        i = the_row,
+        j = asset_col,
+        value =  as_paragraph(
+          as_chunk(
+            "Performance Expectation (PE): Students who demonstrate understanding can:\n",
+            props = fp_text_default(
+              color = "#201209",
+              bold = TRUE,
+              font.size = font_size
+            )
+          ),
+          as_i = V1
+        )
+      )
+    }
+  } 
+  
+  # Compose complex cell for "Clarification Statement"                      ####
+  if (asset == "CS_statement") {
+    for (the_row in seq(from = asset_row,
+                        to = nrow(ft$body$dataset),
+                        by = 9)) {
+      ft <-  compose(
+        ft,
+        i = the_row,
+        j = asset_col,
+        value =  as_paragraph(
+          as_chunk(
+            "Clarifying Statement\n",
+            props = fp_text_default(
+              color = "#201209",
+              bold = TRUE,
+              font.size = font_size
+            )
+          ),
+          as_i = V1
+        )
+      )
+    }
+  }
+  
+    # Compose complex cell for "Assessment Boundary"                          ####
+  if (asset == "AB_statement") {
+    for (the_row in seq(from = asset_row,
+                        to = nrow(ft$body$dataset),
+                        by = 9)) {
+      ft <-  compose(
+        ft,
+        i = the_row,
+        j = asset_col,
+        value =  as_paragraph(
+          as_chunk(
+            "Assessment Boundary\n",
+            props = fp_text_default(
+              color = "#201209",
+              bold = TRUE,
+              font.size = font_size
+            )
+          ),
+          as_i = V1
+        )
+      )
+    }
+  }
+  
+    # Compose complex cell for "DCI"                          ####
+  if (asset == "DCI_statement") {
+    for (the_row in seq(from = asset_row,
+                        to = nrow(ft$body$dataset),
+                        by = 9)) {
+      ft <-  compose(
+        ft,
+        i = the_row,
+        j = asset_col,
+        value =  as_paragraph(
+          as_chunk(
+            "Disciplinary Core Ideas (DCI)\n",
+            props = fp_text_default(
+              color = "#201209",
+              bold = TRUE,
+              font.size = font_size
+            )
+          ),
+          as_i = V2
+        )
+      )
+    }
+  }
+  # Compose complex cell for "SEP"                          ####
+  if (asset == "SEP_statement") {
+    for (the_row in seq(from = asset_row,
+                        to = nrow(ft$body$dataset),
+                        by = 9)) {
+      ft <-  compose(
+        ft,
+        i = the_row,
+        j = asset_col,
+        value =  as_paragraph(
+          as_chunk(
+            "Science and Engineering Practices (SEP)\n",
+            props = fp_text_default(
+              color = "#201209",
+              bold = TRUE,
+              font.size = font_size
+            )
+          ),
+          as_i = V1
+        )
+      )
+    }
+  }
+  
+  
+    # Compose complex cell for "CCC"                          ####
+  if (asset == "CCC_statement") {
+    for (the_row in seq(from = asset_row,
+                        to = nrow(ft$body$dataset),
+                        by = 9)) {
+      ft <-  compose(
+        ft,
+        i = the_row,
+        j = asset_col,
+        value =  as_paragraph(
+          as_chunk(
+            "Crosscutting Concepts (CCC)\n",
+            props = fp_text_default(
+              color = "#201209",
+              bold = TRUE,
+              font.size = font_size
+            )
+          ),
+          as_i = V3
+        )
+      )
+    }
+  }
+  
+    # Compose complex cell for "PA Context"                      ####
+  if (asset == "PA Context_statement") {
+    for (the_row in seq(from = asset_row,
+                        to = nrow(ft$body$dataset),
+                        by = 9)) {
+      ft <-  compose(
+        ft,
+        i = the_row,
+        j = asset_col,
+        value =  as_paragraph(
+          as_chunk(
+            "PA Connections: PA Context and PA Career Ready Skills\n",
+            props = fp_text_default(
+              color = "#201209",
+              bold = TRUE,
+              font.size = font_size
+            )
+          ),
+          as_i = V1
+        )
+      )
+    }
+  }
+  
+  #compose complex cell for PA Career Ready
+    if (asset == "PA Career Ready_statement") {
+    for (the_row in seq(from = asset_row,
+                        to = nrow(ft$body$dataset),
+                        by = 9)) {
+      ft <-  compose(
+        ft,
+        i = the_row,
+        j = asset_col,
+        value =  as_paragraph(
+          as_chunk(
+            "Connections to Other Standards Content and Domains\n",
+            props = fp_text_default(
+              color = "#201209",
+              bold = TRUE,
+              font.size = font_size
+            )
+          ),
+          as_i = V1
+        )
+      )
+    }
+  }
+  
+  
+   # Compose complex cell for "AFNR"                          ####
+  if (asset == "AFNR_statement") {
+    for (the_row in seq(from = asset_row,
+                        to = nrow(ft$body$dataset),
+                        by = 9)) {
+      ft <-  compose(
+        ft,
+        i = the_row,
+        j = asset_col,
+        value =  as_paragraph(
+          as_chunk(
+            "Agriculture\n(Agriculture, Food, and Natural Resources (AFNR) Career Cluster Content Standards\n",
+            props = fp_text_default(
+              color = "#201209",
+              bold = TRUE,
+              font.size = font_size
+            )
+          ),
+          as_i = V1
+        )
+      )
+    }
+  } 
+  
+    # Compose complex cell for "Educational Technology"                          ####
+  if (asset == "ISTE_statement") {
+    for (the_row in seq(from = asset_row,
+                        to = nrow(ft$body$dataset),
+                        by = 9)) {
+      ft <-  compose(
+        ft,
+        i = the_row,
+        j = asset_col,
+        value =  as_paragraph(
+          as_chunk(
+            "Educational Technology\n(ISTE Standards for Students)\n",
+            props = fp_text_default(
+              color = "#201209",
+              bold = TRUE,
+              font.size = font_size
+            )
+          ),
+          as_i = V2
+        )
+      )
+    }
+  } 
+}
+ft
+```
+
+
+
+```{r}
+# Now loop per asset and format
+for (asset in assetsDefs$asset) {
+  # Get asset defs
+  asset_row   <- assetsDefs[assetsDefs$asset == asset, "asset_row"]
+  asset_col   <- assetsDefs[assetsDefs$asset == asset, "asset_col"]
+  merge_to    <- assetsDefs[assetsDefs$asset == asset, "merge_to"]
+  asset_font  <- assetsDefs[assetsDefs$asset == asset, "asset_font"]
+  font_size   <- assetsDefs[assetsDefs$asset == asset, "font_size"]
+  is_bold     <- assetsDefs[assetsDefs$asset == asset, "is_bold"]
+  is_italic   <- assetsDefs[assetsDefs$asset == asset, "is_italic"]
+  font_color  <- assetsDefs[assetsDefs$asset == asset, "font_color"]
+  bg_color    <- assetsDefs[assetsDefs$asset == asset, "bg_color"]
+  v_align     <- assetsDefs[assetsDefs$asset == asset, "v_align"]
+  h_align     <- assetsDefs[assetsDefs$asset == asset, "h_align"]
+  hline_below <-
+    assetsDefs[assetsDefs$asset == asset, "hline_below"]
+  vline_left  <- assetsDefs[assetsDefs$asset == asset, "vline_left"]
+  
+  # Set font size
+  for (the_row in seq(from = asset_row,
+                      to = nrow(ft$body$dataset),
+                      by = 9)) {
+    # Merge cells
+    ft <-
+      fontsize(ft, i = the_row, j = asset_col, size = font_size)
+  }
+  
+}  
+ft 
+```
+
+
+```{r}
+# Now loop per asset and format
+for (asset in assetsDefs$asset) {
+  # Get asset defs
+  asset_row   <- assetsDefs[assetsDefs$asset == asset, "asset_row"]
+  asset_col   <- assetsDefs[assetsDefs$asset == asset, "asset_col"]
+  merge_to    <- assetsDefs[assetsDefs$asset == asset, "merge_to"]
+  asset_font  <- assetsDefs[assetsDefs$asset == asset, "asset_font"]
+  font_size   <- assetsDefs[assetsDefs$asset == asset, "font_size"]
+  is_bold     <- assetsDefs[assetsDefs$asset == asset, "is_bold"]
+  is_italic   <- assetsDefs[assetsDefs$asset == asset, "is_italic"]
+  font_color  <- assetsDefs[assetsDefs$asset == asset, "font_color"]
+  bg_color    <- assetsDefs[assetsDefs$asset == asset, "bg_color"]
+  v_align     <- assetsDefs[assetsDefs$asset == asset, "v_align"]
+  h_align     <- assetsDefs[assetsDefs$asset == asset, "h_align"]
+  hline_below <-
+    assetsDefs[assetsDefs$asset == asset, "hline_below"]
+  vline_left  <- assetsDefs[assetsDefs$asset == asset, "vline_left"]
+
+  # Set font
+  for (the_row in seq(from = asset_row,
+                      to = nrow(ft$body$dataset),
+                      by = 9)) {
+    # Merge cells
+    ft <-
+      font(ft,
+           i = the_row,
+           j = asset_col,
+           fontname = asset_font)
+  }
+}
+ft
+```
+
+```{r}
+# Now loop per asset and format
+for (asset in assetsDefs$asset) {
+  # Get asset defs
+  asset_row   <- assetsDefs[assetsDefs$asset == asset, "asset_row"]
+  asset_col   <- assetsDefs[assetsDefs$asset == asset, "asset_col"]
+  merge_to    <- assetsDefs[assetsDefs$asset == asset, "merge_to"]
+  asset_font  <- assetsDefs[assetsDefs$asset == asset, "asset_font"]
+  font_size   <- assetsDefs[assetsDefs$asset == asset, "font_size"]
+  is_bold     <- assetsDefs[assetsDefs$asset == asset, "is_bold"]
+  is_italic   <- assetsDefs[assetsDefs$asset == asset, "is_italic"]
+  font_color  <- assetsDefs[assetsDefs$asset == asset, "font_color"]
+  bg_color    <- assetsDefs[assetsDefs$asset == asset, "bg_color"]
+  v_align     <- assetsDefs[assetsDefs$asset == asset, "v_align"]
+  h_align     <- assetsDefs[assetsDefs$asset == asset, "h_align"]
+  hline_below <-
+    assetsDefs[assetsDefs$asset == asset, "hline_below"]
+  vline_left  <- assetsDefs[assetsDefs$asset == asset, "vline_left"]
+
+  # Set font size
+  for (the_row in seq(from = asset_row,
+                      to = nrow(ft$body$dataset),
+                      by = 9)) {
+    # Merge cells
+    ft <-
+      fontsize(ft, i = the_row, j = asset_col, size = font_size)
+  }
+
+  # Set font color
+  for (the_row in seq(from = asset_row,
+                      to = nrow(ft$body$dataset),
+                      by = 9)) {
+    # Merge cells
+    ft <- color(ft,
+                i = the_row,
+                j = asset_col,
+                color = font_color)
+  }
+
+  # Set bold, if necessary
+  if (is_bold) {
+    for (the_row in seq(from = asset_row,
+                        to = nrow(ft$body$dataset),
+                        by = 9)) {
+      # Merge cells
+      ft <- bold(ft, i = the_row, j = asset_col)
+    }
+  }
+
+  # Set italic, if necessary
+  if (is_italic) {
+    for (the_row in seq(from = asset_row,
+                        to = nrow(ft$body$dataset),
+                        by = 9)) {
+      # Merge cells
+      ft <- italic(ft, i = the_row, j = asset_col)
+    }
+  }
+}  
+  
+ft
+```
+
+```{r}
+# Now loop per asset and format
+for (asset in assetsDefs$asset) {
+  # Get asset defs
+  asset_row   <- assetsDefs[assetsDefs$asset == asset, "asset_row"]
+  asset_col   <- assetsDefs[assetsDefs$asset == asset, "asset_col"]
+  merge_to    <- assetsDefs[assetsDefs$asset == asset, "merge_to"]
+  asset_font  <- assetsDefs[assetsDefs$asset == asset, "asset_font"]
+  font_size   <- assetsDefs[assetsDefs$asset == asset, "font_size"]
+  is_bold     <- assetsDefs[assetsDefs$asset == asset, "is_bold"]
+  is_italic   <- assetsDefs[assetsDefs$asset == asset, "is_italic"]
+  font_color  <- assetsDefs[assetsDefs$asset == asset, "font_color"]
+  bg_color    <- assetsDefs[assetsDefs$asset == asset, "bg_color"]
+  v_align     <- assetsDefs[assetsDefs$asset == asset, "v_align"]
+  h_align     <- assetsDefs[assetsDefs$asset == asset, "h_align"]
+  hline_below <-
+    assetsDefs[assetsDefs$asset == asset, "hline_below"]
+  vline_left  <- assetsDefs[assetsDefs$asset == asset, "vline_left"]
+
+  # Set background color
+  for (the_row in seq(from = asset_row,
+                      to = nrow(ft$body$dataset),
+                      by = 9)) {
+    ft <- bg(ft, i = the_row, j = asset_col, bg = "#fefefe")
+  }
+
+  # Set vertical alignment
+  for (the_row in seq(from = asset_row,
+                      to = nrow(ft$body$dataset),
+                      by = 9)) {
+    ft <- valign(ft,
+                 i = the_row,
+                 j = asset_col,
+                 valign = v_align)
+  }
+
+  # Set horizontal alignment
+  for (the_row in seq(from = asset_row,
+                      to = nrow(ft$body$dataset),
+                      by = 9)) {
+    ft <- align(ft,
+                i = the_row,
+                j = asset_col,
+                align = h_align)
+  }
+
+  # Create horizontal lines
+  if (hline_below) {
+    for (the_row in seq(from = asset_row,
+                        to = nrow(ft$body$dataset),
+                        by = 9)) {
+      # Merge cells
+      ft <-
+        hline(ft,
+              i = the_row,
+              border = officer::fp_border(width = 1))
+    }
+  }
+
+  # Create vertical lines
+  if (vline_left) {
+    for (the_row in seq(from = asset_row,
+                        to = nrow(ft$body$dataset),
+                        by = 9)) {
+      # Merge cells
+      ft <-   vline(
+        ft,
+        i = the_row,
+        j = asset_col,
+        border = officer::fp_border(width = 1),
+        part = 'body'
+      )
+    }
+  }
+}
+ft
+```
+
+
+```{r}
+ft <- width(ft, j = 1:3, width = 2L)
+ft
+```
+
+
+
